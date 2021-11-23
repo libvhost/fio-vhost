@@ -1,0 +1,15 @@
+[global]
+ioengine=ioat_pmem
+iodepth=2
+runtime=1000
+time_based
+direct=1
+ioat_num=1
+
+[randread-vdb-4k-para]
+bs=256k
+stonewall
+filename=/dev/dax0.1
+rw=write
+size=10g
+cpus_allowed=6

@@ -1,0 +1,12 @@
+[submodule "fio"]
+	path = fio
+	url = https://github.com/libvhost/fio
+[submodule "libiscsi"]
+	path = libiscsi
+	url = https://github.com/libvhost/libiscsi
+[submodule "libvhost"]
+	path = libvhost
+	url = https://github.com/libvhost/libvhost
+[submodule "libvfio"]
+	path = libvfio
+	url = https://github.com/libvfio/libvfio

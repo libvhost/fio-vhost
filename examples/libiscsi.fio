@@ -1,0 +1,12 @@
+[global]
+ioengine=libiscsi
+iodepth=128
+runtime=300
+time_based
+direct=1
+
+[randread-vdb-4k-para]
+bs=4k
+stonewall
+filename=iscsi\://127.0.0.1/iqn.2016-02.com.smartx\:system\:fl-iscsi/1
+rw=randread

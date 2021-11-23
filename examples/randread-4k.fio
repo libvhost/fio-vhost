@@ -1,0 +1,13 @@
+[global]
+ioengine=nvme
+iodepth=32
+runtime=30
+time_based
+direct=1
+
+[randread-vdb-4k-para]
+bs=4k
+stonewall
+filename=nvme\://0000\:00\:03.0/1
+rw=randread
+size=1g

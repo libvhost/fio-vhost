@@ -1,0 +1,17 @@
+name: fio
+on: [push, pull_request]
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    container: docker.io/centos:7
+    steps:
+    - uses: actions/checkout@v2
+ 
+    - name: intall deps
+      run: |
+        yum install -y gcc cmake ninja-build
+    - name: build
+      run: |
+        ./build.sh
