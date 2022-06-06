@@ -5,10 +5,10 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR}/libiscsi/include)
 add_library(iscsi_fio_plugin STATIC ${FIO_SOURCE_DIR}/engines/libiscsi.c)
 add_dependencies(iscsi_fio_plugin fio-ext libiscsi_static)
 
-add_executable(fio fio.c nvme.c vhost.c pmem.c ioat.c)
+add_executable(fio fio.c vhost.c)
 add_dependencies(fio fio-ext)
 set(FIO_LIBRARY -Wl,--whole-archive iscsi_fio_plugin libiscsi_static fio_static -Wl,--no-whole-archive gcrypt)
-target_link_libraries(fio PRIVATE ${FIO_LIBRARY} tcmalloc numa z m pthread dl aio ibverbs rdmacm curl ssl crypto pmem vhost vfio)
+target_link_libraries(fio PRIVATE ${FIO_LIBRARY} numa z m pthread dl aio ibverbs rdmacm curl ssl crypto vhost)
 
 install(TARGETS fio DESTINATION bin COMPONENT fio)
 install(FILES ${CMAKE_SOURCE_DIR}/fio/tools/genfio

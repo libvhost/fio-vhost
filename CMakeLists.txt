@@ -46,7 +46,7 @@ ExternalProject_Add(fio-ext
 set(LIBISCSI_SOURCE_DIR ${CMAKE_SOURCE_DIR}/libiscsi)
 add_subdirectory(libiscsi EXCLUDE_FROM_ALL)
 add_subdirectory(libvhost)
-add_subdirectory(libvfio)
+#add_subdirectory(libvfio)
 add_subdirectory(plugins)
 include_directories(.)
 
