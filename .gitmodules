@@ -10,3 +10,6 @@
 [submodule "libvfio"]
 	path = libvfio
 	url = https://github.com/libvfio/libvfio
+[submodule "libnvmf"]
+	path = libnvmf
+	url = git@github.com:libvhost/libnvmf.git

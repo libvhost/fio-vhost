@@ -34,7 +34,7 @@ struct vhost_info {
   struct fio_vhost **vhosts;
   int nr_vhosts;
 
-  struct vhost_task **cpl_tasks;
+  struct flist_head cpl_tasks;
   int nr_events;
 };
 
@@ -129,7 +129,6 @@ static void fio_vhost_cleanup(struct thread_data *td) {
     libvhost_ctrl_destroy(vhost_info->vhosts[i]->device);
   }
   free(vhost_info->vhosts);
-  free(vhost_info->cpl_tasks);
   free(vhost_info);
 }
 
@@ -149,15 +148,13 @@ static int fio_vhost_init_one(struct thread_data *td,
 
   f->real_file_size = fio_vhost->num_blocks * fio_vhost->block_size;
   f->engine_data = fio_vhost;
-  // printf("pid: %d block size: %d num blocks: %" PRIu64 "\n", getpid(),
-  //        fio_vhost->block_size, fio_vhost->num_blocks);
-  // memset(fio_vhost->device->qps[1]->sq.queue + 64, 0xfe, 64);
   INIT_FLIST_HEAD(&fio_vhost->tasks);
   for (i = 0; i < td->o.iodepth; ++i) {
     task = calloc(1, sizeof(*task));
     INIT_FLIST_HEAD(&task->entry);
     flist_add_tail(&task->entry, &fio_vhost->tasks);
   }
+  INIT_FLIST_HEAD(&vhost_info->cpl_tasks);
   return 0;
 }
 
@@ -170,7 +167,6 @@ static int fio_vhost_init(struct thread_data *td) {
   vhost_info->nr_vhosts = td->o.nr_files;
   vhost_info->vhosts =
       calloc(vhost_info->nr_vhosts, sizeof(struct fio_vhost *));
-  vhost_info->cpl_tasks = calloc(1, td->o.iodepth * sizeof(struct vhost_task));
   td->io_ops_data = vhost_info;
 
   for_each_file(td, f, i) {
@@ -198,7 +194,7 @@ static void vhost_cb(void *opaque, int status) {
     io_u->resid = io_u->xfer_buflen;
   }
 
-  vhost_info->cpl_tasks[vhost_info->nr_events++] = vhost_task;
+  flist_add_tail(&vhost_task->entry, &vhost_info->cpl_tasks);
 }
 
 static enum fio_q_status fio_vhost_queue(struct thread_data *td,
@@ -219,9 +215,6 @@ static enum fio_q_status fio_vhost_queue(struct thread_data *td,
   task->io_u = io_u;
   task->iov.iov_len = io_u->xfer_buflen;
   task->iov.iov_base = io_u->xfer_buf;
-  // q_idx = fio_vhost->queued % (fio_vhost->device->qp_cnt - 1) + 1;
-  // printf("pid: %d io_u offset: %llu len: %llu queued: %d\n", getpid(),
-  //        io_u->offset, io_u->xfer_buflen, fio_vhost->queued);
   fio_vhost->queued++;
   libvhost_submit(fio_vhost->device, 0, io_u->offset, &task->iov, 1,
                   io_u->ddir == DDIR_WRITE, task);
@@ -239,8 +232,6 @@ static int fio_vhost_getevents(struct thread_data *td, unsigned int min,
   vhost_info->nr_events = 0;
   while (nr < min) {
     for (int i = 0; i < vhost_info->nr_vhosts; i++) {
-      // printf("min: %d, vhost_info->nr_events: %d nr :%d device: %d \n", min,
-      //        vhost_info->nr_events, nr, i);
       nr +=
           libvhost_getevents(vhost_info->vhosts[i]->device, 0, 1, &events[nr]);
     }
@@ -254,7 +245,8 @@ static int fio_vhost_getevents(struct thread_data *td, unsigned int min,
 
 static struct io_u *fio_vhost_event(struct thread_data *td, int event) {
   struct vhost_info *vhost_info = (struct vhost_info *)td->io_ops_data;
-  struct vhost_task *task = vhost_info->cpl_tasks[event];
+  struct vhost_task* task = flist_first_entry(&vhost_info->cpl_tasks, struct vhost_task, entry);
+  flist_del(&task->entry);
   task->fio_vhost->queued--;
   flist_add_tail(&task->entry, &task->fio_vhost->tasks);
   return task->io_u;
@@ -285,7 +277,7 @@ static int fio_vhost_prep(struct thread_data *td, struct io_u *io_u) {
 //   return 0;
 // }
 
-int fio_vhost_iomem_alloc(struct thread_data *td, size_t total_mem) {
+static int fio_vhost_iomem_alloc(struct thread_data *td, size_t total_mem) {
   struct vhost_info *vhost_info = td->io_ops_data;
   struct libvhost_ctrl *ctrl = vhost_info->vhosts[0]->device;
   // printf("fio_vhost_iomem_alloc total_mem: %" PRIu64 "\n", total_mem);
@@ -295,13 +287,13 @@ int fio_vhost_iomem_alloc(struct thread_data *td, size_t total_mem) {
   return 0;
 }
 
-void fio_vhost_iomem_free(struct thread_data *td) {
+static void fio_vhost_iomem_free(struct thread_data *td) {
   struct vhost_info *vhost_info = td->io_ops_data;
   struct libvhost_ctrl *ctrl = vhost_info->vhosts[0]->device;
   libvhost_free(ctrl, td->orig_buffer);
 }
 
-struct ioengine_ops ioengine = {
+static struct ioengine_ops ioengine = {
     .name = "vhost",
     .version = FIO_IOOPS_VERSION,
     .flags = FIO_SYNCIO | FIO_DISKLESSIO | FIO_NODISKUTIL,
@@ -309,7 +301,6 @@ struct ioengine_ops ioengine = {
     .cleanup = fio_vhost_cleanup,
     .init = fio_vhost_init,
     .queue = fio_vhost_queue,
-    // .commit = fio_vhost_commit,
     .getevents = fio_vhost_getevents,
     .event = fio_vhost_event,
     .open_file = fio_vhost_open_file,

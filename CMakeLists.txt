@@ -7,8 +7,17 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 if (NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Release)
+    set(CMAKE_BUILD_TYPE RelWithDebInfo)
 endif ()
+
+function(append value)
+   foreach(variable ${ARGN})
+      set(${variable} "${${variable}} ${value}" PARENT_SCOPE)
+   endforeach(variable)
+endfunction()
+
+append("-g3 -ggdb3" CMAKE_C_FLAGS CMAKE_CXX_FLAGS)
+append("-fno-omit-frame-pointer" CMAKE_C_FLAGS CMAKE_CXX_FLAGS)
 
 # example: https://github.com/amzn/hawktracer/blob/master/CMakeLists.txt
 # https://github.com/soedinglab/hh-suite/blob/master/CMakeLists.txt
@@ -47,6 +56,7 @@ set(LIBISCSI_SOURCE_DIR ${CMAKE_SOURCE_DIR}/libiscsi)
 add_subdirectory(libiscsi EXCLUDE_FROM_ALL)
 add_subdirectory(libvhost)
 #add_subdirectory(libvfio)
+add_subdirectory(libnvmf)
 add_subdirectory(plugins)
 include_directories(.)
 
@@ -60,8 +70,8 @@ if (error)
 endif()
 
 SET(CPACK_RPM_COMPONENT_INSTALL 1)
-SET(CPACK_RPM_fio_PACKAGE_NAME fio)
-SET(CPACK_RPM_fio_FILE_NAME fio-${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}-${COMMIT_HASH}.rpm)
+SET(CPACK_RPM_fio_vhost_PACKAGE_NAME fio-vhost)
+SET(CPACK_RPM_fio_vhost_FILE_NAME fio-vhost-${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}-${COMMIT_HASH}.rpm)
 #set(CPACK_GENERATOR "DEB;TGZ;ZIP;RPM")
 set(CPACK_GENERATOR "RPM")
 set(CPACK_RPM_PACKAGE_MAINTAINER "Feng Li")
