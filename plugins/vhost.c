@@ -127,6 +127,13 @@ static void fio_vhost_cleanup(struct thread_data *td) {
   int i;
   for (i = 0; i < vhost_info->nr_vhosts; i++) {
     libvhost_ctrl_destroy(vhost_info->vhosts[i]->device);
+    while (!flist_empty(&vhost_info->vhosts[i]->tasks)) {
+      struct vhost_task *task = flist_first_entry(
+          &vhost_info->vhosts[i]->tasks, struct vhost_task, entry);
+      flist_del(&task->entry);
+      free(task);
+    }
+    free(vhost_info->vhosts[i]);
   }
   free(vhost_info->vhosts);
   free(vhost_info);
