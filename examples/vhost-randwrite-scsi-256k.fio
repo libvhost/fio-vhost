@@ -1,0 +1,14 @@
+[global]
+ioengine=vhost
+iodepth=128
+runtime=300
+time_based
+direct=1
+scsi=1
+target=0
+
+[randread-vdb-256k-para]
+bs=256k
+stonewall
+filename=/var/lib/zbs/aurorad/vhost-scsi.0
+rw=randwrite

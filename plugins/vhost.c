@@ -41,6 +41,8 @@ struct vhost_info {
 struct vhost_options {
   void *pad;
   unsigned int io_num_queue;
+  unsigned int scsi;
+  unsigned int target;
 };
 
 static struct fio_option options[] = {
@@ -54,15 +56,41 @@ static struct fio_option options[] = {
         .group = FIO_OPT_G_INVALID,
     },
     {
+        .name = "scsi",
+        .lname = "libvhost scsi controller",
+        .type = FIO_OPT_INT,
+        .off1 = offsetof(struct vhost_options, scsi),
+        .help = "Whether use the libvhost scsi controller or not",
+        .category = FIO_OPT_C_ENGINE,
+        .group = FIO_OPT_G_INVALID,
+    },
+    {
+        .name = "target",
+        .lname = "vhost scsi target number",
+        .type = FIO_OPT_INT,
+        .off1 = offsetof(struct vhost_options, target),
+        .help = "Set the scsi target number",
+        .category = FIO_OPT_C_ENGINE,
+        .group = FIO_OPT_G_INVALID,
+    },
+    {
         .name = NULL,
     },
 };
 
-static struct libvhost_ctrl *fio_create_ctrl(const char *file) {
+static struct libvhost_ctrl *fio_create_ctrl(const char *file, int scsi, int target) {
   int ret;
-  struct libvhost_ctrl *ctrl = libvhost_ctrl_create(file);
+  struct libvhost_ctrl *ctrl = NULL;
+
+  if (scsi == 0) {
+    ctrl = libvhost_ctrl_create(file);
+  } else if (scsi == 1) {
+    ctrl = libvhost_scsi_ctrl_create(file, target);
+  } else {
+    printf("scsi: value out of range: %d (0 or 1)\n", scsi);
+  }
   if (!ctrl) {
-    goto fail_ctrl;
+    return NULL;
   }
 
   if (!libvhost_ctrl_init_memory(ctrl, 1ULL << 30)) {
@@ -80,7 +108,7 @@ static struct libvhost_ctrl *fio_create_ctrl(const char *file) {
     goto fail_ctrl;
   }
 
-  ret = libvhost_ctrl_add_virtqueue(ctrl, 1024);
+  ret = libvhost_ctrl_add_virtqueue(ctrl, 1, 1024);
   if (ret != 0) {
     printf("libvhost_ctrl_add_virtqueue failed: %d\n", ret);
     goto fail_ctrl;
@@ -95,7 +123,8 @@ fail_ctrl:
 static int fio_vhost_setup(struct thread_data *td) {
   int i;
   struct fio_file *f;
-  struct libvhost_ctrl *ctrl;
+  struct libvhost_ctrl *ctrl = NULL;
+  int scsi, target;
   int ret;
 
   if (td->o.nr_files > 1) {
@@ -104,16 +133,13 @@ static int fio_vhost_setup(struct thread_data *td) {
   }
 
   for_each_file(td, f, i) {
-    ctrl = libvhost_ctrl_create(f->file_name);
+    scsi = ((struct vhost_options *)td->eo)->scsi;
+    target = ((struct vhost_options *)td->eo)->target;
+    ctrl = fio_create_ctrl(f->file_name, scsi , target);
     if (!ctrl) {
       return -1;
     }
-    ret = libvhost_ctrl_connect(ctrl);
-    if (ret != 0) {
-      printf("libvhost_ctrl_connect failed: %d\n", ret);
-      libvhost_ctrl_destroy(ctrl);
-      return -1;
-    }
+
     f->real_file_size =
         libvhost_ctrl_get_blocksize(ctrl) * libvhost_ctrl_get_numblocks(ctrl);
     libvhost_ctrl_destroy(ctrl);
@@ -144,9 +170,12 @@ static int fio_vhost_init_one(struct thread_data *td,
                               int d_idx) {
   struct fio_vhost *fio_vhost = NULL;
   struct vhost_task *task;
-  int i;
+  int i, scsi, target;
+
+  scsi = ((struct vhost_options *)td->eo)->scsi;
+  target = ((struct vhost_options *)td->eo)->target;
   fio_vhost = calloc(1, sizeof(*fio_vhost));
-  fio_vhost->device = fio_create_ctrl(f->file_name);
+  fio_vhost->device = fio_create_ctrl(f->file_name, scsi, target);
   fio_vhost->info = vhost_info;
   vhost_info->vhosts[d_idx] = fio_vhost;
 
